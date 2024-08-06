@@ -11,7 +11,8 @@ class WareHouseSerializer(serializers.ModelSerializer):
     class Meta:
         model = WareHouse
         fields = '__all__'
-        
+        # fields = ['id', 'name', 'address', 'manager']
+        # read_only_fields = ['manager']
         
 class StockSerializer(serializers.ModelSerializer): 
     class Meta:

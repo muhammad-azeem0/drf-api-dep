@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.contrib.auth.models import User
 from .models import Product, WareHouse, TransferStock, Stock
 from .serializers import ProductSerializer, WareHouseSerializer, TransferStockSerializer, StockSerializer
 from rest_framework.response import Response
@@ -69,18 +70,28 @@ class productViewSet(viewsets.ViewSet):
 
 class WareHouseViewSet(viewsets.ViewSet):
     
+    def get_objects(self, pk):
+        try:
+            return WareHouse.objects.select_related('manager').get(pk=pk)
+        except WareHouse.DoesNotExist:
+            return None
+        
     def list(self, request):
-        objs = WareHouse.objects.all()
+        objs = WareHouse.objects.select_related('manager').all()
         serializer = WareHouseSerializer(objs, many = True) 
         return Response(serializer.data)
     
    
     def retrieve(self, request, pk = None):
-        obj = WareHouse.objects.get(id=pk)
-        serializer = WareHouseSerializer(obj)
-        return Response(serializer.data)
+        # obj = WareHouse.objects.select_related('manager').get(id=pk)
+        obj = self.get_objects(pk)
+        if obj is not None:
+            serializer = WareHouseSerializer(obj)
+            return Response(serializer.data)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        
    
-       
+   
     def create(self, request):
         data = request.data
         serializer = WareHouseSerializer(data = data)
@@ -91,32 +102,43 @@ class WareHouseViewSet(viewsets.ViewSet):
    
    
     def update(self, request, pk):
-        id = pk
-        stu = WareHouse.objects.get(pk=id)
-        serializer = WareHouseSerializer(stu, data = request.data)
-            
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'Complete Data Updated !!'})
-        return Response(serializer.errors)
+        # id = pk
+        # obj = WareHouse.objects.select_related('manager').get(pk=id)
+        obj = self.get_objects(pk)
+        
+        if obj is not None:
+            serializer = WareHouseSerializer(obj, data = request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'msg':'Complete Data Updated !!'})
+            return Response(serializer.errors)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
    
     def partial_update(self, request, pk):
-        id = pk
-        stu = WareHouse.objects.get(pk=id)
-        serializer = WareHouseSerializer(stu, data = request.data, partial = True)
-            
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'partial Data Updated !!'})
-        return Response(serializer.errors)
+        # id = pk
+        # stu = WareHouse.objects.select_related('manager').get(pk=id)
+        obj = self.get_objects(pk)
+        
+        if obj is not None:
+            serializer = WareHouseSerializer(obj, data = request.data, partial = True)
+                
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'msg':'partial Data Updated !!'})
+            return Response(serializer.errors)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
    
     def destroy(self, request, pk):
-        id = pk 
-        stu = WareHouse.objects.get(pk=id)
-        stu.delete()
-        return Response({'msg':'Data Deleted !!'})
+        # id = pk 
+        # stu = WareHouse.objects.select_related('manager').get(pk=id)
+        obj = self.get_objects(pk)
+        
+        if obj is not None:
+            obj.delete()
+            return Response({'msg':'Data Deleted !!'})
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
    
    
 
@@ -124,17 +146,26 @@ class WareHouseViewSet(viewsets.ViewSet):
 
 class TransferStockViewset(viewsets.ViewSet):
     
+    def get_object(self, pk):
+        try:
+            return TransferStock.objects.select_related('from_warehouse','to_warehouse', 'user', 'product').get(pk=pk)
+        except TransferStock.DoesNotExist:
+            return None
+            
+    
     def list(self, request):
-        queryset = TransferStock.objects.all()
+        queryset = TransferStock.objects.select_related('from_warehouse','to_warehouse', 'user', 'product').all()
         serializer = TransferStockSerializer(queryset, many = True)
         return Response(serializer.data)
     
+    
     def retrieve(self, request, pk=None):
-        id = pk
-        queryset = TransferStock.objects.get(pk = id)
-        serializer = TransferStockSerializer(queryset)
+        obj = self.get_object(pk)
         
-        return Response(serializer.data)
+        if obj is not None:
+            serializer = TransferStockSerializer(obj)
+            return Response(serializer.data)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
     
     def create(self, request):
@@ -146,32 +177,37 @@ class TransferStockViewset(viewsets.ViewSet):
     
     
     def update(self, request, pk):
-        id = pk
-        obj = TransferStock.objects.get(pk = id)
-        serializer = TransferStockSerializer(obj, data= request.data)
+        obj = self.get_object(pk)
         
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'Complete Data Updated !!'})
-        return Response(serializer.errors)
+        if obj is not None:
+            serializer = TransferStockSerializer(obj, data= request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'msg':'Complete Data Updated !!'})
+            return Response(serializer.errors)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
     
     def partial_update(self, request, pk):
-        id = pk
-        stu = TransferStock.objects.get(pk=id)
-        serializer = TransferStockSerializer(stu, data = request.data, partial = True)
-            
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'partial Data Updated !!'})
-        return Response(serializer.errors)
+        obj = self.get_object(pk)
+        
+        if obj is not None:
+            serializer = TransferStockSerializer(obj, data = request.data, partial = True)
+                
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'msg':'partial Data Updated !!'})
+            return Response(serializer.errors)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
    
     def destroy(self, request, pk):
-        id = pk 
-        stu = TransferStock.objects.get(pk=id)
-        stu.delete()
-        return Response({'msg':'Data Deleted !!'})
+        obj = self.get_object(pk)
+        
+        if obj is not None:
+            obj.delete()
+            return Response({'msg':'Data Deleted !!'})
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
     
     
@@ -180,51 +216,68 @@ class TransferStockViewset(viewsets.ViewSet):
 
 class StockViewset(viewsets.ViewSet):
     
+    def get_object(self, pk):
+        try:
+            return Stock.objects.select_related('warehouse', 'product').get(pk=pk)
+        except Stock.DoesNotExist:
+            return None
+        
+    
     def list(self, request):
-        queryset = Stock.objects.all()
+        queryset = Stock.objects.select_related('warehouse', 'product').all()
         serializer = StockSerializer(queryset, many = True)
         return Response(serializer.data)
     
+    
     def retrieve(self, request, pk=None):
-        id = pk
-        queryset = Stock.objects.get(pk = id)
-        serializer = StockSerializer(queryset)
+        obj = self.get_object(pk)
         
-        return Response(serializer.data)
+        if obj is not None:
+            serializer = StockSerializer(obj)
+            return Response(serializer.data)
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
     
     def create(self, request):
         serializer = StockSerializer(data = request.data)
+        
         if serializer.is_valid():
             serializer.save()
-            return Response({'msg':'Data Created !!'})
+            return Response({'msg':'Data Created !!'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors)
     
     
     def update(self, request, pk):
-        id = pk
-        obj = Stock.objects.get(pk = id)
-        serializer = StockSerializer(obj, data= request.data)
+        obj = self.get_object(pk)
         
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'Complete Data Updated !!'})
-        return Response(serializer.errors)
+        if obj is not None:
+            serializer = StockSerializer(obj, data= request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'msg':'Complete Data Updated !!'})
+            return Response(serializer.errors)
+        
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
     
     def partial_update(self, request, pk):
-        id = pk
-        stu = Stock.objects.get(pk=id)
-        serializer = StockSerializer(stu, data = request.data, partial = True)
-            
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'partial Data Updated !!'})
-        return Response(serializer.errors)
+        obj = self.get_object(pk)
+        
+        if obj is not None:
+            serializer = StockSerializer(obj, data = request.data, partial = True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({'msg':'partial Data Updated !!'})
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
    
     def destroy(self, request, pk):
-        id = pk 
-        stu = Stock.objects.get(pk=id)
-        stu.delete()
-        return Response({'msg':'Data Deleted !!'})
+        obj = self.get_object(pk)
+        
+        if obj is not None:
+            obj.delete()
+            return Response({'msg':'Data Deleted !!'}, status=status.HTTP_204_NO_CONTENT)
+        
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)

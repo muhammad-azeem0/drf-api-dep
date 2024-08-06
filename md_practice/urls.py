@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 from rest_framework.routers import DefaultRouter
 from app import views
-
+from debug_toolbar.toolbar import debug_toolbar_urls
 
 router = DefaultRouter()
 
@@ -19,8 +19,7 @@ urlpatterns = [
     
     path('', include(router.urls)),
     
-    
-]
+]+ debug_toolbar_urls()
 
 
 if settings.DEBUG:

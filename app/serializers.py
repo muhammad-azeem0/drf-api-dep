@@ -12,7 +12,7 @@ class WareHouseSerializer(serializers.ModelSerializer):
         model = WareHouse
         #fields = '__all__'
         fields = ['id', 'name', 'address', 'manager']
-        # read_only_fields = ['manager']
+        read_only_fields = ['manager']
         
         
 class StockSerializer(serializers.ModelSerializer):
@@ -27,6 +27,8 @@ class StockSerializer(serializers.ModelSerializer):
 class TransferStockSerializer(serializers.ModelSerializer): 
     class Meta:
         model = TransferStock
-        fields = '__all__'
+        # fields = '__all__'
+        fields = ['id', 'from_warehouse', 'to_warehouse', 'product','user', 'quantity', 'status']
+        read_only_fields = ['user']
         
         

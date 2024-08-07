@@ -97,7 +97,7 @@ class WareHouseViewSet(viewsets.ViewSet):
         data = request.data
         serializer = WareHouseSerializer(data = data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(manager = request.user)
             return Response({'msg':'Data Created !!'})
         return Response(serializer.errors)
    
@@ -179,44 +179,63 @@ class TransferStockViewset(viewsets.ViewSet):
     
     def create(self, request):
         serializer = TransferStockSerializer(data=request.data)
-        
         if serializer.is_valid():
-            from_warehouse_id = serializer.validated_data['from_warehouse'].id #sw 
-            to_warehouse_id = serializer.validated_data['to_warehouse'].id # iw
-            product_id = serializer.validated_data['product'].id #samsung
-            quantity = serializer.validated_data['quantity'] # 2
+            from_warehouse_id = serializer.validated_data['from_warehouse'].id
+            to_warehouse_id = serializer.validated_data['to_warehouse'].id
+            product_id = serializer.validated_data['product'].id
+            quantity = serializer.validated_data['quantity']
             
-            try:
-                with transaction.atomic():
-                    stock_from_warehouse = Stock.objects.get(warehouse_id=from_warehouse_id, product_id=product_id)
-                    
-                    if stock_from_warehouse.quantity < quantity:
-                        return Response({'error': 'Insufficient stock in the source warehouse.'}, status=status.HTTP_400_BAD_REQUEST)
-                    
-                    stock_from_warehouse.quantity -= quantity
-                    stock_from_warehouse.save()
-                    
-                    # This Django ORM method is used to either fetch an existing record or create a new one if it doesn't exist. 
-                    # It takes query parameters to locate the record and optional defaults to set values if a new record needs to be created.
-                    stock_to_warehouse, created = Stock.objects.get_or_create(
-                        warehouse_id=to_warehouse_id,
-                        product_id=product_id,
-                        defaults={'quantity': 0}
+            if from_warehouse_id != to_warehouse_id:
+                try:
+                    with transaction.atomic():
+                        # Check if stock exists in the source warehouse and if there's enough quantity
+                        stock_from_warehouse = Stock.objects.get(warehouse_id=from_warehouse_id, product_id=product_id)
+                        
+                        if stock_from_warehouse.quantity < quantity:
+                            return Response({'error': 'Insufficient stock in the source warehouse.'},status=status.HTTP_400_BAD_REQUEST)
+                        
+                        # Deduct quantity from the source warehouse
+                        stock_from_warehouse.quantity -= quantity
+                        stock_from_warehouse.save()
+                        
+                        # Get or create stock in the destination warehouse
+                        stock_to_warehouse, created = Stock.objects.get_or_create(
+                            warehouse_id=to_warehouse_id,
+                            product_id=product_id,
+                            defaults={'quantity': 0}
+                        )
+                        
+                        # Add quantity to the destination warehouse
+                        stock_to_warehouse.quantity += quantity
+                        stock_to_warehouse.save()
+                        
+                        # Save the transfer record
+
+                        #serializer.save(status=TransferStock.Status.INTRANSIT)
+                        serializer.save(user=request.user)
+                        
+                    return Response({'msg': 'Stock transferred successfully'},status=status.HTTP_201_CREATED)
+                
+                except Stock.DoesNotExist:
+                    return Response(
+                        {'error': 'Stock entry not found in the source warehouse.'},
+                        status=status.HTTP_404_NOT_FOUND
                     )
-                    
-                    stock_to_warehouse.quantity += quantity
-                    stock_to_warehouse.save()
-                    
-                    serializer.save(status=TransferStock.Status.INTRANSIT)
-                return Response({'msg': 'Stock transferred successfully'}, status=status.HTTP_201_CREATED)
-            
-            except Stock.DoesNotExist:
-                return Response({'error': 'Stock entry not found in the source warehouse.'}, status=status.HTTP_404_NOT_FOUND)
-            
-            except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+                
+                except Exception as e:
+                    return Response(
+                        {'error': str(e)},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                return Response(
+                    {'error': 'Source and destination warehouses are the same.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    
     
     def update(self, request, pk):
         obj = self.get_object(pk)

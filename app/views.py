@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import status
 from django.db.models import F
+from django.db import transaction
 # Create your views here.
 
 
@@ -167,14 +168,55 @@ class TransferStockViewset(viewsets.ViewSet):
             return Response(serializer.data)
         return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
+    # # create function without transaction atomic
+    # def create(self, request):
+    #     serializer = TransferStockSerializer(data = request.data)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response({'msg':'Data Created !!'})
+    #     return Response(serializer.errors)
+    
     
     def create(self, request):
-        serializer = TransferStockSerializer(data = request.data)
+        serializer = TransferStockSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'Data Created !!'})
-        return Response(serializer.errors)
-    
+            from_warehouse_id = serializer.validated_data['from_warehouse'].id #sw 
+            to_warehouse_id = serializer.validated_data['to_warehouse'].id # iw
+            product_id = serializer.validated_data['product'].id #samsung
+            quantity = serializer.validated_data['quantity'] # 2
+            
+            try:
+                with transaction.atomic():
+                    stock_from_warehouse = Stock.objects.get(warehouse_id=from_warehouse_id, product_id=product_id)
+                    
+                    if stock_from_warehouse.quantity < quantity:
+                        return Response({'error': 'Insufficient stock in the source warehouse.'}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    stock_from_warehouse.quantity -= quantity
+                    stock_from_warehouse.save()
+                    
+                    # This Django ORM method is used to either fetch an existing record or create a new one if it doesn't exist. 
+                    # It takes query parameters to locate the record and optional defaults to set values if a new record needs to be created.
+                    stock_to_warehouse, created = Stock.objects.get_or_create(
+                        warehouse_id=to_warehouse_id,
+                        product_id=product_id,
+                        defaults={'quantity': 0}
+                    )
+                    
+                    stock_to_warehouse.quantity += quantity
+                    stock_to_warehouse.save()
+                    
+                    serializer.save(status=TransferStock.Status.INTRANSIT)
+                return Response({'msg': 'Stock transferred successfully'}, status=status.HTTP_201_CREATED)
+            
+            except Stock.DoesNotExist:
+                return Response({'error': 'Stock entry not found in the source warehouse.'}, status=status.HTTP_404_NOT_FOUND)
+            
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def update(self, request, pk):
         obj = self.get_object(pk)
@@ -239,7 +281,7 @@ class StockViewset(viewsets.ViewSet):
             return Response(serializer.data)
         return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
-    
+    # # simple create function without transaction atomicity
     def create(self, request):
         serializer = StockSerializer(data = request.data)
         
@@ -247,6 +289,8 @@ class StockViewset(viewsets.ViewSet):
             serializer.save()
             return Response({'msg':'Data Created !!'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors)
+    
+    
     
     
     def update(self, request, pk):

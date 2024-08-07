@@ -45,13 +45,11 @@ class TransferStock(models.Model):
     class Status(models.TextChoices):
         RECIEVED = 'RE','Recieved'
         INTRANSIT = 'IN','Intransit'
-        CANCELLED = 'CA','Cancelled'
-        PROCESSING = 'PR','Processing'
         # PROCESSING is used to refer that choice in code
         # PR is database readable
         # Processing is human readable
         
-    status = models.CharField(max_length=10, choices = Status.choices, default = Status.PROCESSING)
+    status = models.CharField(max_length=10, choices = Status.choices, default = Status.INTRANSIT)
     
     
     

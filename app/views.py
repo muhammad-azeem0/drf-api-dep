@@ -5,7 +5,7 @@ from .serializers import ProductSerializer, WareHouseSerializer, TransferStockSe
 from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import status
-
+from django.db.models import F
 # Create your views here.
 
 
@@ -224,7 +224,9 @@ class StockViewset(viewsets.ViewSet):
         
     
     def list(self, request):
-        queryset = Stock.objects.select_related('warehouse', 'product').all()
+        queryset = Stock.objects.select_related('warehouse', 'product').annotate(
+            name = F('warehouse__name')
+            ).all()
         serializer = StockSerializer(queryset, many = True)
         return Response(serializer.data)
     
